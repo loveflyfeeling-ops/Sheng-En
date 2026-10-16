@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>雲端聖恩宮・祈福聖殿</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://unpkg.com/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@600;900&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'LXGW WenKai TC', 'Noto Serif TC', serif; background: #1c0d0a; color: #fef3c7; -webkit-tap-highlight-color: transparent; }
+  .serif { font-family: 'Noto Serif TC', serif; }
+  .gold { background: linear-gradient(135deg, #fde68a 0%, #d97706 50%, #fbbf24 100%); }
+  .gold-border { border: 1.5px solid rgba(251,191,36,.55); }
+  @keyframes smoke { 0% { transform: translateY(0) scale(.8); opacity: .8 } 100% { transform: translateY(-50px) translateX(-6px) scale(1.6); opacity: 0 } }
+  .smoke { animation: smoke 3s infinite ease-in-out; }
+  @keyframes shake { 0%,100% { transform: rotate(0) } 25% { transform: rotate(-14deg) translateY(-6px) } 75% { transform: rotate(14deg) translateY(4px) } }
+  .shaking { animation: shake .45s infinite; }
+  @keyframes toss { 0% { transform: translateY(0) rotateX(0) } 50% { transform: translateY(-90px) rotateX(540deg) scale(1.2) } 100% { transform: translateY(0) rotateX(720deg) } }
+  .tossing { animation: toss .7s ease-out; }
+  .vpoem { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: .25em; }
+  .no-sb::-webkit-scrollbar { display: none } .no-sb { scrollbar-width: none }
+  [v-cloak] { display: none }
+  input, select, textarea { font-size: 16px; }
+</style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-[#2b0909] via-[#1c0a07] to-[#120604]">
+<div id="app" v-cloak class="max-w-md mx-auto min-h-screen flex flex-col pb-24 border-x border-amber-900/30">
+
+  <header class="sticky top-0 z-30 bg-[#3b0a0a]/95 backdrop-blur border-b-2 border-amber-500/60 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-full gold flex items-center justify-center text-red-950 font-black">聖</div>
+      <div>
+        <h1 class="serif text-lg font-black tracking-wider text-amber-300 leading-tight">{{ cfg.temple_name }}・祈福聖殿</h1>
+        <p class="text-[11px] text-amber-200/80">善信：{{ profile.displayName }}｜{{ online ? '🟢 雲端連線中' : '🌐 網頁版' }}</p>
+      </div>
+    </div>
+    <button @click="tab='search'" class="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-200 text-xs">🏮 尋燈</button>
+  </header>
+
+  <!-- ═════════ 大殿參拜 ═════════ -->
+  <main v-if="tab==='worship'" class="flex-1 p-4 space-y-4">
+    <div class="flex items-center gap-1">
+    <button @click="stepDeity(-1)" aria-label="上一尊" class="shrink-0 w-8 h-8 rounded-full bg-red-950 border border-amber-500/60 text-amber-300 font-black">‹</button>
+    <div ref="deityBar" @wheel.prevent="wheelBar" @mousedown="dragStart" class="flex-1 min-w-0 flex overflow-x-auto gap-2 py-1 no-sb cursor-grab select-none scroll-smooth">
+      <button v-for="(d,i) in deities" :key="d.name" :data-i="i" @click="onPill(i)"
+        :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap', deityIdx===i ? 'gold text-red-950' : 'bg-red-950/70 text-amber-200/80 border border-amber-700/40']">
+        <img :src="deityImg(d.name)" @error="imgFallback($event, d.name)" alt="" class="inline-block w-5 h-6 object-cover rounded-sm align-middle mr-1" />{{ d.role==='主祀' ? '👑 ' : '' }}{{ d.name }}</button>
+    </div>
+    <button @click="stepDeity(1)" aria-label="下一尊" class="shrink-0 w-8 h-8 rounded-full bg-red-950 border border-amber-500/60 text-amber-300 font-black">›</button>
+    </div>
+    <div class="rounded-2xl bg-gradient-to-b from-[#520f0f] via-[#380909] to-[#210505] gold-border p-5 text-center"
+         @touchstart="touchX=$event.touches[0].clientX" @touchend="swipe($event)">
+      <div class="flex justify-between text-xs mb-2"><span class="px-2 py-0.5 rounded bg-red-900 border border-amber-400/50 text-amber-300 font-bold">{{ deity.role }}</span><span class="text-amber-300/80 flex items-center gap-2"><button @click="stepDeity(-1)" class="px-1.5 hover:text-amber-200">◀</button>巡禮 {{ deityIdx+1 }}/{{ deities.length }}<button @click="stepDeity(1)" class="px-1.5 hover:text-amber-200">▶</button></span></div>
+      <div class="w-48 h-56 mx-auto rounded-t-full overflow-hidden border-4 border-amber-400/80 bg-gradient-to-b from-[#6b1414] to-[#2a0707] shadow-[0_0_45px_rgba(251,191,36,.45)]">
+        <img :key="deity.name" :src="deityImg(deity.name)" @error="imgFallback($event, deity.name)" :alt="deity.name + '神像'" class="w-full h-full object-cover" /></div>
+      <h2 class="serif text-2xl font-black text-amber-300 mt-3 tracking-widest">{{ deity.name }}</h2>
+      <p class="text-xs text-amber-100/80 mt-1">{{ deity.title_desc }}</p>
+      <div class="flex flex-wrap justify-center gap-1.5 mt-3"><span v-for="t in deity.blessing_tags" :key="t" class="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-400/30 text-amber-200 text-xs">✨ {{ t }}</span></div>
+      <div class="mt-5 h-16 flex items-end justify-center">
+        <div v-if="incenseLit" class="flex gap-3 items-end">
+          <div v-for="n in 3" :key="n" class="flex flex-col items-center"><div class="w-2 h-2 rounded-full bg-amber-200/60 smoke mb-1"></div><div class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></div><div class="w-1 h-10 bg-gradient-to-b from-amber-200 to-red-800 rounded-full"></div></div>
+        </div>
+        <div v-else class="text-xs text-amber-300/60 mb-3">（請誠心默念姓名與心願後上香）</div>
+      </div>
+      <div class="w-40 h-11 mx-auto rounded-b-3xl rounded-t-lg gold text-red-950 font-black flex items-center justify-center border-2 border-amber-200 text-sm">寶 鼎 香 爐</div>
+      <input v-model="wish" maxlength="60" placeholder="今日祈福心願（如：闔家平安、工作順利）" class="w-full mt-4 px-3 py-2 rounded-lg bg-black/40 border border-amber-500/40 text-amber-100 placeholder-amber-300/40" />
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <button @click="lightIncense" class="py-2.5 rounded-xl gold text-red-950 font-black text-sm active:scale-95">🙏 誠心上香稟報</button>
+        <button @click="pray.target_deity=deity.name; tab='fortune'" class="py-2.5 rounded-xl bg-red-900 border border-amber-400/60 text-amber-200 font-bold text-sm active:scale-95">🎋 向此神尊求籤</button>
+      </div>
+    </div>
+    <div class="rounded-xl bg-black/35 gold-border p-3">
+      <div class="text-xs font-bold text-amber-400 mb-2 flex justify-between"><span>🔥 雲端祈福牆</span><span class="text-amber-300/60 font-normal">最新祈福・每 30 秒更新</span></div>
+      <div class="space-y-2 mb-3 pb-3 border-b border-amber-500/20">
+        <div class="grid grid-cols-2 gap-2">
+          <input v-model="wallName" maxlength="20" placeholder="信眾姓名" class="w-full min-w-0 px-3 py-2 rounded-lg bg-black/40 border border-amber-500/40 text-amber-100 placeholder-amber-300/40 text-sm" />
+          <select v-model="wallDeity" class="w-full min-w-0 px-2 py-2 rounded-lg bg-black/40 border border-amber-500/40 text-amber-100 text-sm">
+            <option v-for="d in deities" :key="d.name" :value="d.name">向 {{ d.name }}</option></select>
+        </div>
+        <textarea v-model="wallWish" maxlength="60" rows="2" placeholder="祈福心願（60 字內，例：祈求家父手術順利、早日康復）" class="w-full px-3 py-2 rounded-lg bg-black/40 border border-amber-500/40 text-amber-100 placeholder-amber-300/40 text-sm"></textarea>
+        <div class="flex items-center justify-between gap-2">
+          <label class="text-xs text-amber-200/80 flex items-center gap-1"><input type="checkbox" v-model="wallAnon" class="accent-amber-500" />匿名顯示（只顯示姓氏）</label>
+          <span class="text-[11px] text-amber-300/50">{{ wallWish.length }}/60</span>
+        </div>
+        <button @click="postWall" :disabled="busy" class="w-full py-2.5 rounded-xl gold text-red-950 font-black text-sm active:scale-95">📝 寫上祈福牆</button>
+      </div>
+      <div class="space-y-1.5 max-h-64 overflow-y-auto text-xs">
+        <div v-for="(l,i) in worshipLogs" :key="i" class="flex justify-between border-b border-amber-500/10 pb-1"><span class="min-w-0 break-words">🙏 <b class="text-amber-300">{{ l.name }}</b> 向【{{ l.deity }}】祈求：{{ l.wish || '誠心參拜' }}</span><span class="text-amber-400/60 ml-2 whitespace-nowrap">{{ l.time }}</span></div>
+        <div v-if="!worshipLogs.length" class="text-amber-200/50">尚無上香紀錄，成為今日第一位上香的善信吧！</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═════════ 百首靈籤 ═════════ -->
+  <main v-if="tab==='fortune'" class="flex-1 p-4 space-y-4">
+    <div class="grid grid-cols-3 gap-1 text-center text-xs bg-black/40 p-2 rounded-xl gold-border">
+      <div :class="step==='PRAY'?'text-amber-300 font-bold':'text-amber-200/50'">① 焚香稟報</div>
+      <div :class="step==='DRAW'?'text-amber-300 font-bold':'text-amber-200/50'">② 抽籤擲三聖杯</div>
+      <div :class="step==='RESULT'?'text-amber-300 font-bold':'text-amber-200/50'">③ 靈籤與聖示</div>
+    </div>
+
+    <div v-if="step==='PRAY'" class="rounded-2xl bg-[#380909]/90 gold-border p-4 space-y-3 text-sm">
+      <div class="flex justify-between items-center border-b border-amber-500/30 pb-2">
+        <h2 class="serif text-lg font-black text-amber-300">🎋 關聖帝君百首靈籤</h2>
+        <button @click="quickOpen=true" class="text-xs underline text-amber-400">已在廟內抽籤？</button>
+      </div>
+      <label class="block text-xs text-amber-300">祈求指點之神尊
+        <select v-model="pray.target_deity" class="w-full mt-1 px-3 py-2 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100">
+          <option v-for="d in deities" :key="d.name" :value="d.name">{{ d.role }}：{{ d.name }}</option></select></label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="text-xs text-amber-300">姓名<input v-model="pray.believer_name" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <label class="text-xs text-amber-300">求問類別<select v-model="pray.category" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100"><option v-for="c in categories" :key="c">{{ c }}</option></select></label>
+      </div>
+      <label class="block text-xs text-amber-300">生辰（可填吉時）<input v-model="pray.birth_info" placeholder="例：甲午年三月初三日 吉時" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      <label class="block text-xs text-amber-300">居住地址（稟報用）<input v-model="pray.address" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      <label class="block text-xs text-amber-300">具體稟報問題<textarea v-model="pray.question" rows="2" placeholder="例：弟子想轉換工作跑道，今年時機是否合適？" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100"></textarea></label>
+      <button @click="startPray" :disabled="busy" class="w-full py-3 rounded-xl gold text-red-950 font-black">🙏 稟報完畢，恭請開啟籤筒</button>
+    </div>
+
+    <div v-if="step==='DRAW'" class="rounded-2xl bg-[#380909]/90 gold-border p-5 text-center space-y-4">
+      <div class="text-xs text-amber-300">祈求：【{{ pray.target_deity }}】｜{{ pray.category }}</div>
+      <div v-if="!div.candidate" class="py-4 flex flex-col items-center space-y-4">
+        <div :class="['w-28 h-36 rounded-2xl gold border-4 border-red-900 flex flex-col items-center justify-center', shaking?'shaking':'']"><div class="text-3xl">🎋</div><div class="serif text-red-950 font-black text-sm mt-1">百首靈籤筒</div></div>
+        <p class="text-sm text-amber-100 px-4">{{ div.message }}</p>
+        <button @click="drawStick" :disabled="shaking" class="px-8 py-3 rounded-xl gold text-red-950 font-black">{{ shaking ? '誠心搖籤中…' : '🎋 搖晃籤筒抽籤' }}</button>
+      </div>
+      <div v-else class="space-y-4">
+        <div class="inline-block px-5 py-2 rounded-full bg-red-950 border-2 border-amber-400 text-amber-300 font-black text-lg">第 {{ div.candidate }} 籤（待擲筊確認）</div>
+        <div class="flex justify-center gap-3"><div v-for="n in 3" :key="n" :class="['px-3 py-1 rounded-lg text-xs font-bold border', div.sheng>=n?'bg-amber-400 text-red-950 border-amber-200':'bg-black/40 text-amber-400/40 border-amber-600/30']">🌙 第{{ n }}聖杯</div></div>
+        <div class="h-24 flex items-center justify-center gap-6">
+          <div :class="['w-16 h-8 rounded-t-full bg-red-600 border-2 border-amber-300 flex items-center justify-center text-xs font-bold', tossing?'tossing':'']">{{ blockFaces[0] }}</div>
+          <div :class="['w-16 h-8 rounded-t-full bg-red-700 border-2 border-amber-300 flex items-center justify-center text-xs font-bold', tossing?'tossing':'']">{{ blockFaces[1] }}</div>
+        </div>
+        <p class="text-sm text-amber-200 font-bold min-h-[2.5rem]">{{ div.message }}</p>
+        <button @click="throwBlocks" :disabled="tossing" class="w-full py-3 rounded-xl gold text-red-950 font-black">{{ tossing ? '擲筊請示中…' : '🌙 誠心擲筊請示' }}</button>
+      </div>
+    </div>
+
+    <div v-if="step==='RESULT' && stick" class="space-y-4">
+      <div class="rounded-2xl bg-[#fdf6e2] text-stone-900 border-4 border-red-800 p-4"><div class="border border-red-700 p-3">
+        <div class="flex justify-between items-center border-b-2 border-red-800 pb-2 mb-3 gap-2">
+          <span class="serif text-lg font-black text-red-800">{{ stick.title }}</span>
+          <span class="text-xs text-red-900">{{ stick.ganzhi_code }}｜{{ stick.story_title }}</span>
+          <span class="px-2.5 py-0.5 rounded bg-red-800 text-amber-200 font-black text-sm">{{ stick.rank }}</span>
+        </div>
+        <div class="flex gap-2">
+          <div class="text-xs space-y-1 text-stone-700 w-1/2 pr-2 border-r border-red-300">
+            <template v-if="stick.shengyi && stick.shengyi.length"><div class="font-bold text-red-900">【聖意】</div>
+            <div class="flex flex-wrap gap-1"><span v-for="t in stick.shengyi" :key="t" class="px-1.5 border border-red-300 rounded">{{ t }}</span></div></template>
+            <template v-if="stick.vernacular_advice"><div class="font-bold text-red-900 mt-2">【解曰】</div><p>{{ stick.vernacular_advice }}</p></template>
+            <template v-if="stick.dongpo_note"><div class="font-bold text-red-900 mt-2">【東坡解】</div><p>{{ stick.dongpo_note }}</p></template>
+            <template v-if="stick.bixian_note"><div class="font-bold text-red-900 mt-2">【碧仙註】</div><p>{{ stick.bixian_note }}</p></template>
+          </div>
+          <div class="vpoem serif text-xl font-black text-red-900 h-52 mx-auto leading-loose"><p v-for="(l,i) in stick.poem" :key="i">{{ l }}</p></div>
+        </div>
+        <div v-if="stick.sacred_meanings && Object.keys(stick.sacred_meanings).length" class="mt-3 pt-2 border-t border-red-300 text-xs text-stone-700 space-y-1">
+          <div class="font-bold text-red-900">【各項解說】</div>
+          <div v-for="(v,k) in stick.sacred_meanings" :key="k" :class="k===pray.category?'bg-amber-100 rounded px-1':''"><b class="text-red-900">{{ k }}</b>：{{ v }}</div>
+        </div>
+      </div></div>
+      <div class="rounded-2xl bg-[#380909]/95 gold-border p-4 space-y-3 text-sm">
+        <div class="flex justify-between items-center"><h3 class="serif font-black text-amber-300">✨ 【{{ pray.target_deity }}】聖示解籤</h3>
+          <button v-if="!ai" @click="requestAI" :disabled="busy" class="px-3 py-1.5 rounded-lg gold text-red-950 font-black text-xs">{{ busy ? '神尊感應中…' : '🔮 恭請神尊解籤' }}</button></div>
+        <div v-if="ai" class="space-y-3 text-amber-100 leading-relaxed">
+          <div class="p-3 rounded-xl bg-black/40 border border-amber-500/30 text-amber-300 font-bold">「{{ ai.deity_greeting }}」</div>
+          <div><b class="text-amber-400">【核心聖示】</b><p>{{ ai.core_answer }}</p></div>
+          <div><b class="text-amber-400">【籤意剖析】</b><p>{{ ai.poem_breakdown }}</p></div>
+          <div><b class="text-amber-400">【行動指引】</b><ul class="list-disc list-inside text-amber-200"><li v-for="(a,i) in ai.actionable_advice" :key="i">{{ a }}</li></ul></div>
+          <p class="text-amber-300">{{ ai.blessing_closing }}</p>
+          <div class="p-3 rounded-xl bg-gradient-to-r from-red-950 to-amber-950/60 border border-amber-400 flex items-center justify-between">
+            <div><div class="text-xs text-amber-300">🏮 神尊護持建議點亮</div><div class="font-black text-amber-200">【{{ ai.recommended_lamp }}】</div></div>
+            <button @click="tab='lamps'" class="px-3 py-2 rounded-lg gold text-red-950 font-black text-xs">線上點燈 ➔</button></div>
+          <p class="text-[11px] text-amber-200/50">解籤內容僅供信仰參考，涉及健康、法律、財務重大決定請諮詢專業人士。</p>
+        </div>
+        <button @click="resetFortune" class="w-full py-2 rounded-lg bg-black/40 text-amber-300/80 text-xs border border-amber-500/20">重新稟報求籤</button>
+      </div>
+    </div>
+
+    <div v-if="quickOpen" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+      <div class="bg-[#380909] gold-border rounded-2xl p-4 w-full max-w-sm space-y-3">
+        <h3 class="serif text-lg font-black text-amber-300">🏛️ 廟內抽籤・雲端解籤</h3>
+        <input v-model.number="quickNo" type="number" min="1" max="100" placeholder="輸入籤號 1~100" class="w-full px-3 py-2 rounded-lg bg-black/50 border border-amber-400 text-amber-100" />
+        <textarea v-model="pray.question" rows="2" placeholder="想請示的問題" class="w-full px-3 py-2 rounded-lg bg-black/50 border border-amber-400 text-amber-100"></textarea>
+        <div class="flex gap-2"><button @click="quickOpen=false" class="flex-1 py-2 rounded-lg bg-black/50 text-amber-200 text-xs">取消</button><button @click="quickInterpret" class="flex-1 py-2 rounded-lg gold text-red-950 font-black text-xs">立即解籤</button></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═════════ 點燈安太歲 ═════════ -->
+  <main v-if="tab==='lamps'" class="flex-1 p-4 space-y-4">
+    <div v-if="!online" class="rounded-2xl bg-amber-900/30 border border-amber-500 p-4 space-y-2 text-sm">
+      <div class="font-black text-amber-300">📞 點燈、安太歲請洽本宮</div>
+      <p class="text-xs text-amber-200/80">網頁版提供線上參拜、祈福與求籤；點燈、安太歲請來電、加 LINE 或親臨本宮辦理。</p>
+      <div v-if="staticLamps.length" class="pt-1 grid grid-cols-1 gap-1">
+        <div v-for="l in staticLamps" :key="l.name" class="flex justify-between text-xs bg-black/30 rounded px-2 py-1"><span>🏮 {{ l.name }}</span><span class="text-amber-300">NT$ {{ l.price.toLocaleString() }}</span></div>
+      </div>
+      <div v-if="sc.phone">☎️ 電話：<a :href="'tel:' + sc.phone" class="underline text-amber-300">{{ sc.phone }}</a></div>
+      <div v-if="sc.line_url">💬 LINE：<a :href="sc.line_url" target="_blank" rel="noopener" class="underline text-amber-300">加入本宮官方帳號</a></div>
+      <div v-if="sc.address">📍 地址：{{ sc.address }}</div>
+      <div v-if="sc.hours">🕰️ 服務時間：{{ sc.hours }}</div>
+      <div v-if="bank.account" class="pt-2 border-t border-amber-500/30 text-xs">🏦 {{ bank.bank_name }}<span v-if="bank.bank_code">（{{ bank.bank_code }}）</span> {{ bank.branch }}｜帳號 <b class="text-amber-300 tracking-wider">{{ bank.account }}</b> <span v-if="bank.account_name">戶名 {{ bank.account_name }}</span></div>
+    </div>
+    <div v-if="online" class="rounded-2xl bg-[#380909]/95 gold-border p-4 space-y-3">
+      <div class="flex justify-between items-center border-b border-amber-500/30 pb-2">
+        <div><h2 class="serif font-black text-amber-300">☯️ 新增家人・立春太歲試算</h2><p class="text-[11px] text-amber-200/70">依「立春交節」時刻核定生肖與流年太歲</p></div>
+        <select v-model.number="targetYear" @change="loadFamily" class="px-2 py-1 rounded bg-red-950 border border-amber-400 text-amber-200 text-xs font-bold"><option v-for="y in yearOptions" :key="y.year" :value="y.year">{{ y.label }}</option></select>
+      </div>
+      <p v-if="yearInfo" class="text-[11px] text-amber-200/80">{{ targetYear }} {{ yearInfo.ganzhi }}年（值年太歲 {{ yearInfo.general }}）犯太歲生肖：<span v-for="(v,k) in yearInfo.taisui_zodiacs" :key="k" class="mr-1">{{ k.replace('太歲','') }}{{ v.join('') }}</span></p>
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <label class="text-amber-300">姓名<input v-model="member.name" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <label class="text-amber-300">稱謂<select v-model="member.gender" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100"><option>信士</option><option>信女</option><option>小信士</option><option>小信女</option></select></label>
+        <label class="text-amber-300">國曆生日<input v-model="member.solar_birth_date" type="date" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <label class="text-amber-300">出生時辰<select v-model="member.birth_hour" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100"><option :value="null">吉時（不知道）</option><option v-for="h in hours" :key="h.v" :value="h.v">{{ h.t }}</option></select></label>
+        <label class="text-amber-300">關係<select v-model="member.relationship" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100"><option v-for="r in ['本人','配偶','父親','母親','子女','孫子女','兄弟姊妹','其他']" :key="r">{{ r }}</option></select></label>
+        <label class="text-amber-300">電話（尋燈用）<input v-model="member.phone" type="tel" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <label class="col-span-2 text-amber-300">通信地址（印疏文）<input v-model="member.address" class="w-full mt-1 px-2.5 py-1.5 rounded bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      </div>
+      <button @click="addMember" :disabled="busy || !online" class="w-full py-2.5 rounded-xl gold text-red-950 font-black text-sm">➕ 加入家庭祈福名冊</button>
+    </div>
+
+    <div v-for="m in family" :key="m.believer.id" class="rounded-2xl bg-black/45 gold-border p-3.5 space-y-2.5">
+      <div class="flex justify-between items-start gap-2">
+        <div><span class="font-black text-amber-200">{{ m.believer.name }}</span><span class="ml-1.5 text-xs text-amber-400">屬{{ m.believer.zodiac }}｜{{ m.believer.lunar_birth_text }}</span></div>
+        <span v-if="m.taisui.is_conflict" class="px-2 py-0.5 rounded bg-red-600 text-white font-black text-xs whitespace-nowrap">⚠️ {{ m.taisui.conflict_types.join('、') }}</span>
+        <span v-else class="px-2 py-0.5 rounded bg-emerald-800/80 text-emerald-200 text-xs whitespace-nowrap">✅ 平順</span>
+      </div>
+      <p class="text-xs text-amber-200/80 bg-red-950/60 p-2 rounded">💡 {{ m.taisui.temple_advice }}</p>
+      <div class="grid grid-cols-2 gap-1.5">
+        <label v-for="l in lampTypes" :key="l.code" :class="['flex items-center justify-between p-2 rounded-lg border text-xs', picked(m.believer.id,l.code)?'bg-amber-500/25 border-amber-400 font-bold':'bg-black/30 border-amber-500/20 text-amber-200/70']">
+          <span class="flex items-center gap-1"><input type="checkbox" class="accent-amber-500" :checked="picked(m.believer.id,l.code)" @change="toggle(m.believer,l)" />{{ l.name }}<span v-if="m.taisui.recommended_lamp_codes.includes(l.code)" class="text-red-400">★</span></span><span class="text-amber-400">${{ l.price }}</span></label>
+      </div>
+    </div>
+
+    <div v-if="cart.length" class="rounded-2xl bg-gradient-to-b from-red-950 to-black gold-border p-4 space-y-3">
+      <div class="flex justify-between border-b border-amber-500/30 pb-2"><span class="serif font-black text-amber-300">🧾 共 {{ cart.length }} 盞</span><span class="text-lg font-black text-amber-400">NT$ {{ cartTotal.toLocaleString() }}</span></div>
+      <div v-for="(c,i) in cart" :key="i" class="flex justify-between text-xs"><span>• {{ c.name }}【{{ c.lamp_name }}】</span><span>${{ c.price }}</span></div>
+      <div class="text-xs text-amber-300">付款方式</div>
+      <div :class="['grid gap-1.5 text-sm', payOptions.length > 2 ? 'grid-cols-3' : 'grid-cols-2']">
+        <button v-for="p in payOptions" :key="p.v" @click="payMethod=p.v" :class="['py-2.5 rounded-lg border', payMethod===p.v?'gold text-red-950 font-black':'border-amber-500/40 text-amber-200']">{{ p.t }}</button>
+      </div>
+      <p class="text-[11px] text-amber-200/70">{{ payMethod==='BANK_TRANSFER' ? '送出後會顯示本宮匯款帳號，匯款後請回報帳號後五碼。' : payMethod==='TEMPLE_CASH' ? '送出後請至本宮服務台繳納功德金，執事人員確認後即點燈。' : '' }}</p>
+      <button @click="submitOrder" :disabled="busy" class="w-full py-3 rounded-xl gold text-red-950 font-black">🙏 確認送出報名</button>
+    </div>
+
+    <div v-if="lastOrder" class="rounded-2xl bg-emerald-950/90 border-2 border-amber-400 p-4 space-y-2 text-center">
+      <h3 class="serif text-lg font-black text-amber-300">📝 報名完成</h3>
+      <p class="text-xs">訂單編號：{{ lastOrder.order_no }}｜NT$ {{ lastOrder.total_amount.toLocaleString() }}</p>
+      <p class="text-xs text-amber-200">{{ lastOrder.message }}</p>
+      <div v-for="l in lastOrder.lamps" :key="l.id" class="text-xs text-left">🏮 {{ l.believer_name }}【{{ l.lamp_name }}】➔ {{ l.pillar_location }}</div>
+
+      <div v-if="lastOrder.payment_method==='BANK_TRANSFER'" class="text-left rounded-xl bg-black/40 border border-amber-400/60 p-3 space-y-1.5 text-sm">
+        <div class="font-black text-amber-300">🏦 本宮匯款帳號</div>
+        <div v-if="bank.bank_name">銀行：{{ bank.bank_name }}<span v-if="bank.bank_code">（代碼 {{ bank.bank_code }}）</span> {{ bank.branch }}</div>
+        <div class="flex items-center gap-2">帳號：<b class="text-amber-300 text-base tracking-wider">{{ bank.account || '（廟方尚未設定）' }}</b>
+          <button v-if="bank.account" @click="copyText(bank.account)" class="px-2 py-0.5 rounded bg-amber-500/30 text-xs">複製</button></div>
+        <div v-if="bank.account_name">戶名：{{ bank.account_name }}</div>
+        <div>應匯金額：<b class="text-amber-300">NT$ {{ lastOrder.total_amount.toLocaleString() }}</b></div>
+        <div class="pt-2 mt-1 border-t border-amber-500/30 space-y-1.5">
+          <div class="text-xs text-amber-200">匯款完成後，請回報您的帳號後五碼：</div>
+          <div class="flex gap-2">
+            <input v-model="transferLast5" maxlength="5" inputmode="numeric" placeholder="後五碼" class="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100 tracking-widest" />
+            <input v-model="transferDate" type="date" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100 text-xs" />
+          </div>
+          <button @click="reportTransfer" :disabled="busy || lastOrder.reported" class="w-full py-2 rounded-lg gold text-red-950 font-black text-sm">{{ lastOrder.reported ? '✅ 已回報，待廟方核帳' : '📨 回報匯款' }}</button>
+        </div>
+      </div>
+      <p v-if="lastOrder.payment_method==='TEMPLE_CASH'" class="text-xs text-amber-200">請攜帶訂單編號至本宮服務台繳納 NT$ {{ lastOrder.total_amount.toLocaleString() }}。</p>
+    </div>
+  </main>
+
+  <!-- ═════════ 法會報名 ═════════ -->
+  <main v-if="tab==='ceremony'" class="flex-1 p-4 space-y-4">
+    <div class="rounded-2xl bg-[#380909]/95 gold-border p-4">
+      <h2 class="serif text-lg font-black text-amber-300">🪷 法會線上報名</h2>
+      <p class="text-xs text-amber-200/70 mt-1">選擇法會與項目，填寫資料後依指示匯款或現場繳費。</p>
+    </div>
+    <div v-if="!online && formUrl('ceremony')" class="rounded-2xl bg-black/45 gold-border p-2 space-y-2">
+      <iframe v-if="formEmbed('ceremony')" :src="formEmbed('ceremony')" class="w-full rounded-xl bg-white" style="height:1500px;border:0" loading="lazy">載入中…</iframe>
+      <a :href="formUrl('ceremony')" target="_blank" rel="noopener" class="block text-center py-2.5 rounded-xl gold text-red-950 font-black text-sm">📝 開啟法會報名表單（新視窗）</a>
+      <p v-if="sc.phone" class="text-center text-xs text-amber-200/70">有問題請來電 <a :href="'tel:' + sc.phone" class="underline">{{ sc.phone }}</a></p>
+    </div>
+    <div v-if="!online && !formUrl('ceremony')" class="rounded-2xl bg-amber-900/30 border border-amber-500 p-4 space-y-2 text-sm">
+      <div class="font-black text-amber-300">📞 法會報名請洽本宮</div>
+      <p class="text-xs text-amber-200/80">網頁版提供線上參拜、祈福與求籤；法會報名請來電、加 LINE 或親臨本宮辦理。</p>
+      <div v-if="sc.phone">☎️ 電話：<a :href="'tel:' + sc.phone" class="underline text-amber-300">{{ sc.phone }}</a></div>
+      <div v-if="sc.line_url">💬 LINE：<a :href="sc.line_url" target="_blank" rel="noopener" class="underline text-amber-300">加入本宮官方帳號</a></div>
+      <div v-if="sc.address">📍 地址：{{ sc.address }}</div>
+      <div v-if="sc.hours">🕰️ 服務時間：{{ sc.hours }}</div>
+      <div v-if="bank.account" class="pt-2 border-t border-amber-500/30 text-xs">🏦 {{ bank.bank_name }}<span v-if="bank.bank_code">（{{ bank.bank_code }}）</span> {{ bank.branch }}｜帳號 <b class="text-amber-300 tracking-wider">{{ bank.account }}</b> <span v-if="bank.account_name">戶名 {{ bank.account_name }}</span></div>
+    </div>
+    <div v-if="online && !ceremonies.length" class="text-sm text-amber-200/60 text-center py-8">目前沒有開放報名的法會，敬請期待。</div>
+
+    <div v-for="c in ceremonies" :key="c.id" class="rounded-2xl bg-black/45 gold-border p-4 space-y-2">
+      <div class="flex justify-between items-start gap-2">
+        <h3 class="serif text-lg font-black text-amber-200">{{ c.title }}</h3>
+        <span :class="['px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap', c.open ? 'bg-emerald-700 text-emerald-100' : 'bg-stone-700 text-stone-300']">{{ c.open ? '報名中' : c.closed_reason }}</span>
+      </div>
+      <div class="text-xs text-amber-100/80 space-y-0.5">
+        <div v-if="c.event_date">📅 {{ c.event_date }}</div>
+        <div v-if="c.location">📍 {{ c.location }}</div>
+        <div v-if="c.deity_name">🙏 主事神尊：{{ c.deity_name }}</div>
+        <div v-if="c.deadline">⏰ 報名截止：{{ c.deadline }}</div>
+        <div v-if="c.remaining !== null">👥 剩餘名額：{{ c.remaining }}</div>
+      </div>
+      <p v-if="c.description" class="text-xs text-amber-200/90 whitespace-pre-line bg-red-950/50 p-2 rounded">{{ c.description }}</p>
+      <div class="flex flex-wrap gap-1.5"><span v-for="it in c.items" :key="it.name" class="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-400/30 text-xs">{{ it.name }}・{{ it.price ? 'NT$ ' + it.price.toLocaleString() : '免費結緣' }}</span></div>
+      <button v-if="c.open && cRegId!==c.id" @click="openCeremony(c)" class="w-full py-2.5 rounded-xl gold text-red-950 font-black text-sm">📝 我要報名</button>
+
+      <div v-if="cRegId===c.id && !cDone" class="space-y-2 pt-2 border-t border-amber-500/30 text-sm">
+        <label class="block text-xs text-amber-300">報名項目
+          <select v-model="cf.item_name" class="w-full mt-1 px-3 py-2 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100">
+            <option v-for="it in c.items" :key="it.name" :value="it.name">{{ it.name }}（NT$ {{ it.price.toLocaleString() }}）</option></select></label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="text-xs text-amber-300">報名人姓名<input v-model="cf.name" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+          <label class="text-xs text-amber-300">數量<input v-model.number="cf.quantity" type="number" min="1" max="99" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+          <label class="text-xs text-amber-300">聯絡電話<input v-model="cf.phone" type="tel" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+          <label class="text-xs text-amber-300">地址<input v-model="cf.address" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        </div>
+        <label class="block text-xs text-amber-300">參加／祈福名單（一行一位，可含生辰）
+          <textarea v-model="cf.participantsText" rows="3" placeholder="林大德 甲午年三月初三日 吉時&#10;陳美玉" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100"></textarea></label>
+        <label class="block text-xs text-amber-300">備註<input v-model="cf.note" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button v-for="p in [{v:'BANK_TRANSFER',t:'🏦 匯款支付'},{v:'TEMPLE_CASH',t:'💰 現場付現'}]" :key="p.v" @click="cf.payment_method=p.v" :class="['py-2 rounded-lg border text-sm', cf.payment_method===p.v?'gold text-red-950 font-black':'border-amber-500/40 text-amber-200']">{{ p.t }}</button>
+        </div>
+        <div class="flex justify-between items-center text-amber-300"><span>應繳金額</span><b class="text-lg">NT$ {{ cTotal(c).toLocaleString() }}</b></div>
+        <div class="flex gap-2"><button @click="cRegId=null" class="flex-1 py-2 rounded-lg bg-black/40 text-amber-200 text-sm">取消</button>
+          <button @click="submitCeremony(c)" :disabled="busy" class="flex-[2] py-2 rounded-lg gold text-red-950 font-black text-sm">確認送出報名</button></div>
+      </div>
+
+      <div v-if="cRegId===c.id && cDone" class="rounded-xl bg-emerald-950/80 border border-amber-400 p-3 space-y-1.5 text-sm">
+        <div class="font-black text-amber-300">✅ 報名完成</div>
+        <div class="text-xs">報名編號：{{ cDone.registration.reg_no }}｜{{ cDone.registration.item_name }} ×{{ cDone.registration.quantity }}｜NT$ {{ cDone.registration.amount.toLocaleString() }}</div>
+        <div class="text-xs text-amber-200">{{ cDone.message }}</div>
+        <template v-if="cDone.bank">
+          <div class="pt-1 border-t border-amber-500/30">🏦 {{ cDone.bank.bank_name }}<span v-if="cDone.bank.bank_code">（{{ cDone.bank.bank_code }}）</span> {{ cDone.bank.branch }}</div>
+          <div class="flex items-center gap-2">帳號：<b class="text-amber-300 tracking-wider">{{ cDone.bank.account || '（廟方尚未設定）' }}</b><button v-if="cDone.bank.account" @click="copyText(cDone.bank.account)" class="px-2 py-0.5 rounded bg-amber-500/30 text-xs">複製</button></div>
+          <div v-if="cDone.bank.account_name">戶名：{{ cDone.bank.account_name }}</div>
+          <div class="flex gap-2 pt-1">
+            <input v-model="cLast5" maxlength="5" inputmode="numeric" placeholder="匯款後五碼" class="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" />
+            <button @click="reportCeremonyTransfer" :disabled="busy || cDone.reported" class="px-4 py-1.5 rounded-lg gold text-red-950 font-black text-xs">{{ cDone.reported ? '已回報' : '回報匯款' }}</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═════════ 隨緣濟世 ═════════ -->
+  <main v-if="tab==='jishi'" class="flex-1 p-4 space-y-4">
+    <div class="rounded-2xl bg-[#380909]/95 gold-border p-4">
+      <h2 class="serif text-lg font-black text-amber-300">🧘 隨緣濟世・線上報名問事</h2>
+      <p class="text-xs text-amber-200/70 mt-1">請填寫基本資料與欲請示之事，報名完成後會取得報名編號，濟世當天報上編號即可。</p>
+    </div>
+
+    <div v-for="s in jsSessions" :key="s.id" class="rounded-xl bg-black/40 gold-border p-3 text-xs space-y-0.5">
+      <div class="flex justify-between"><b class="text-amber-200 text-sm">{{ s.title }}</b><span :class="s.open ? 'text-emerald-300' : 'text-stone-400'">{{ s.open ? '報名中' : s.closed_reason }}</span></div>
+      <div v-if="s.event_date">📅 {{ s.event_date }}</div><div v-if="s.location">📍 {{ s.location }}</div>
+      <div v-if="s.deity_name">🙏 {{ s.deity_name }}</div><div v-if="s.remaining !== null">👥 剩餘名額 {{ s.remaining }}</div>
+      <p v-if="s.description" class="text-amber-200/80 whitespace-pre-line">{{ s.description }}</p>
+    </div>
+
+    <div v-if="!online && formUrl('jishi')" class="rounded-2xl bg-black/45 gold-border p-2 space-y-2">
+      <iframe v-if="formEmbed('jishi')" :src="formEmbed('jishi')" class="w-full rounded-xl bg-white" style="height:1500px;border:0" loading="lazy">載入中…</iframe>
+      <a :href="formUrl('jishi')" target="_blank" rel="noopener" class="block text-center py-2.5 rounded-xl gold text-red-950 font-black text-sm">📝 開啟隨緣濟世報名表單（新視窗）</a>
+      <p v-if="sc.phone" class="text-center text-xs text-amber-200/70">有問題請來電 <a :href="'tel:' + sc.phone" class="underline">{{ sc.phone }}</a></p>
+    </div>
+    <div v-if="!online && !formUrl('jishi')" class="rounded-2xl bg-amber-900/30 border border-amber-500 p-4 space-y-2 text-sm">
+      <div class="font-black text-amber-300">📞 隨緣濟世報名請洽本宮</div>
+      <p class="text-xs text-amber-200/80">網頁版提供線上參拜、祈福與求籤；隨緣濟世報名請來電、加 LINE 或親臨本宮辦理。</p>
+      <div v-if="sc.phone">☎️ 電話：<a :href="'tel:' + sc.phone" class="underline text-amber-300">{{ sc.phone }}</a></div>
+      <div v-if="sc.line_url">💬 LINE：<a :href="sc.line_url" target="_blank" rel="noopener" class="underline text-amber-300">加入本宮官方帳號</a></div>
+      <div v-if="sc.address">📍 地址：{{ sc.address }}</div>
+      <div v-if="sc.hours">🕰️ 服務時間：{{ sc.hours }}</div>
+      <div v-if="bank.account" class="pt-2 border-t border-amber-500/30 text-xs">🏦 {{ bank.bank_name }}<span v-if="bank.bank_code">（{{ bank.bank_code }}）</span> {{ bank.branch }}｜帳號 <b class="text-amber-300 tracking-wider">{{ bank.account }}</b> <span v-if="bank.account_name">戶名 {{ bank.account_name }}</span></div>
+    </div>
+    <div v-if="!jsDone && online" class="rounded-2xl bg-[#380909]/90 gold-border p-4 space-y-2.5 text-sm">
+      <label v-if="jsSessions.length" class="block text-xs text-amber-300">報名場次
+        <select v-model="js.session_id" class="w-full mt-1 px-3 py-2 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100">
+          <option v-for="s in jsSessions.filter(x => x.open)" :key="s.id" :value="s.id">{{ s.title }} {{ s.event_date }}</option>
+          <option :value="null">不指定場次（由廟方安排）</option></select></label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="text-xs text-amber-300">姓名 *<input v-model="js.name" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+        <label class="text-xs text-amber-300">電話 *<input v-model="js.phone" type="tel" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      </div>
+      <label class="block text-xs text-amber-300">生辰 *<input v-model="js.birth" placeholder="例：甲午年三月初三日 吉時（或國曆 2000/10/10 上午10點）" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      <label class="block text-xs text-amber-300">住址 *<input v-model="js.address" placeholder="例：雲林縣斗六市…" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /></label>
+      <label class="block text-xs text-amber-300">所要請示的事情 *<textarea v-model="js.question" rows="4" maxlength="1000" placeholder="請簡述想請示的事情，例：家中長輩身體欠安，請示調養方向與化解之道。" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100"></textarea></label>
+      <button @click="submitJishi" :disabled="busy" class="w-full py-3 rounded-xl gold text-red-950 font-black">🙏 送出報名</button>
+    </div>
+
+    <div v-else-if="jsDone" class="rounded-2xl bg-emerald-950/90 border-2 border-amber-400 p-5 text-center space-y-2">
+      <div class="text-3xl">🙏</div>
+      <h3 class="serif text-lg font-black text-amber-300">報名完成</h3>
+      <div class="text-xs text-amber-200">您的報名編號</div>
+      <div class="text-3xl font-black tracking-wider text-amber-300 font-mono">{{ jsDone.reg_no }}</div>
+      <div class="text-sm">{{ jsDone.session_title }}<span v-if="jsDone.queue_no">｜順序第 {{ jsDone.queue_no }} 號</span></div>
+      <div class="text-xs text-amber-100/80 text-left bg-black/30 rounded-lg p-2">{{ jsDone.name }}｜{{ jsDone.birth }}<br>{{ jsDone.question }}</div>
+      <p class="text-xs text-amber-200/80">請截圖或記下報名編號，濟世當天報上編號或姓名即可。</p>
+      <button @click="jsDone=null; js.question=''" class="px-4 py-2 rounded-lg bg-black/40 text-amber-200 text-xs border border-amber-500/30">再報名一位</button>
+    </div>
+
+    <div v-if="online" class="rounded-2xl bg-black/40 gold-border p-4 space-y-2">
+      <div class="text-sm font-bold text-amber-300">🔍 查詢我的報名編號</div>
+      <div class="flex gap-2"><input v-model="jsQueryPhone" type="tel" placeholder="報名電話" class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" />
+        <button @click="queryJishi" class="px-4 py-2 rounded-lg gold text-red-950 font-black text-sm">查詢</button></div>
+      <div v-for="r in jsMine" :key="r.reg_no" class="flex justify-between text-xs border-b border-amber-500/10 py-1">
+        <span><b class="font-mono text-amber-300">{{ r.reg_no }}</b>｜{{ r.name }}｜{{ r.session_title }}</span><span>{{ r.status }}</span></div>
+      <p v-if="jsQueried && !jsMine.length" class="text-xs text-amber-200/60">查無報名資料</p>
+    </div>
+  </main>
+
+  <!-- ═════════ 線上尋燈 ═════════ -->
+  <main v-if="tab==='search'" class="flex-1 p-4 space-y-4">
+    <div v-if="paidNotice" class="rounded-xl bg-emerald-900/80 border border-amber-400 p-3 text-sm text-center">🎉 付款成功！聖燈已於雲端大殿點亮，感謝狀已傳送至您的 LINE。
+      <a v-if="paidNotice.order_no" :href="`/api/print/shuwen/${paidNotice.order_no}?phone=${encodeURIComponent(query)}`" target="_blank" class="block mt-2 underline text-amber-300">📜 下載本次祈福疏文 PDF</a></div>
+    <div v-if="!online" class="rounded-2xl bg-amber-900/30 border border-amber-500 p-4 space-y-2 text-sm">
+      <div class="font-black text-amber-300">📞 線上尋燈請洽本宮</div>
+      <p class="text-xs text-amber-200/80">網頁版提供線上參拜、祈福與求籤；線上尋燈請來電、加 LINE 或親臨本宮辦理。</p>
+      <div v-if="sc.phone">☎️ 電話：<a :href="'tel:' + sc.phone" class="underline text-amber-300">{{ sc.phone }}</a></div>
+      <div v-if="sc.line_url">💬 LINE：<a :href="sc.line_url" target="_blank" rel="noopener" class="underline text-amber-300">加入本宮官方帳號</a></div>
+      <div v-if="sc.address">📍 地址：{{ sc.address }}</div>
+      <div v-if="sc.hours">🕰️ 服務時間：{{ sc.hours }}</div>
+      <div v-if="bank.account" class="pt-2 border-t border-amber-500/30 text-xs">🏦 {{ bank.bank_name }}<span v-if="bank.bank_code">（{{ bank.bank_code }}）</span> {{ bank.branch }}｜帳號 <b class="text-amber-300 tracking-wider">{{ bank.account }}</b> <span v-if="bank.account_name">戶名 {{ bank.account_name }}</span></div>
+    </div>
+    <div v-if="online" class="rounded-2xl bg-[#380909]/95 gold-border p-4 space-y-3">
+      <h2 class="serif font-black text-amber-300">🏮 雲端光明燈塔・線上尋燈</h2>
+      <div class="flex gap-2"><input v-model="query" type="tel" placeholder="報名電話" class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-black/50 border border-amber-500/40 text-amber-100" /><button @click="searchLights" class="px-5 py-2 rounded-lg gold text-red-950 font-black">尋燈</button></div>
+      <p v-if="searched && !lights.length" class="text-xs text-amber-200/70">查無已點亮之燈位（付款完成後才會顯示）。</p>
+    </div>
+    <div v-for="(l,i) in lights" :key="i" class="rounded-2xl bg-gradient-to-r from-[#4a0e0e] via-[#6b1414] to-[#4a0e0e] border-2 border-amber-400 p-4 flex items-center gap-4">
+      <div class="w-16 h-20 rounded-t-full gold flex flex-col items-center justify-center text-red-950 border-2 border-white/60 animate-pulse"><span class="text-2xl">🏮</span><span class="text-[10px] font-black">元辰光彩</span></div>
+      <div class="flex-1 space-y-1">
+        <span class="px-2 py-0.5 rounded bg-amber-400 text-red-950 font-black text-xs">{{ l.pillar_location }}</span>
+        <div class="serif text-lg font-black text-amber-200">{{ l.believer_name }}－{{ l.lamp_name }}</div>
+        <div class="text-xs text-amber-100/80">{{ l.target_year }} 年｜護持：{{ l.deity_name }}</div>
+        <a v-if="l.real_photo_url" :href="l.real_photo_url" target="_blank"><img :src="l.real_photo_url" class="mt-1 w-full max-h-40 object-cover rounded-lg border border-amber-400" /></a>
+      </div>
+    </div>
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#2a0707]/95 backdrop-blur border-t-2 border-amber-500/50 grid grid-cols-6 py-2 z-40">
+    <button v-for="t in tabs" :key="t.k" @click="tab=t.k" :class="['flex flex-col items-center', tab===t.k?'text-amber-400 font-black':'text-amber-200/60']"><span class="text-xl">{{ t.i }}</span><span class="text-[11px] whitespace-nowrap">{{ t.t }}</span></button>
+  </nav>
+
+  <div v-if="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-900 text-amber-200 border-2 border-amber-400 px-4 py-2 rounded-2xl shadow-2xl text-sm max-w-xs text-center">{{ toast }}</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const { createApp } = Vue;
+const DEITY_SLUGS = { '關聖帝君': 'guansheng', '福德正神': 'fude', '天上聖母': 'mazu', '十二延天溪女娘娘': 'xinu',
+  '玄天上帝': 'xuantian', '中壇元帥': 'nezha', '濟公大師父': 'jigong1', '濟公二師父': 'jigong2' };
+const DEMO_DEITIES = [
+  ['關聖帝君','主祀','關聖','文衡聖帝・協天大帝・武財尊神',['忠義護佑','事業功名','武財正財']],
+  ['福德正神','陪祀','福德','土地公・商業財庫',['五穀豐登','商業財庫']],
+  ['天上聖母','陪祀','聖母','媽祖・慈航普渡',['慈悲護航','闔家平安']],
+  ['十二延天溪女娘娘','陪祀','溪女','本宮在地守護・婦幼良緣',['婦幼安康','良緣貴人']],
+  ['玄天上帝','陪祀','玄天','北極真武・消災解厄',['消災解厄','延壽健康']],
+  ['中壇元帥','陪祀','元帥','三太子・開路先鋒',['行車平安','孩童安康']],
+  ['濟公大師父','陪祀','濟公','濟公活佛・靈感濟世',['指點迷津','化險為夷']],
+  ['濟公二師父','陪祀','二師','排憂解難・開運招福',['廣結善緣','開運招福']],
+].map(([name,role,short_icon,title_desc,blessing_tags]) => ({name,role,short_icon,title_desc,blessing_tags}));
+const DEMO_STICK = { number: 1, title: '第一籤', ganzhi_code: '甲甲', rank: '上吉', poem: ['巍巍獨步向雲間','玉殿千官第一班','富貴榮華天付汝','福如東海壽如山'],
+  shengyi: ['功名遂','福祿全','訟得理','病即痊','桑麻熟','婚姻圓','孕生子','行人還'], sacred_meanings: {}, vernacular_advice: '（展示模式）啟動後端即可看到完整解說。', story_title: '十八學士登瀛洲' };
+
+const API_BASE = ((window.TEMPLE_CONFIG || {}).apiBase || '').replace(/\/$/, '');
+async function api(path, opts = {}) {
+  if (!API_BASE) throw new Error('此功能請洽本宮辦理');
+  const r = await fetch(API_BASE + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : (data.detail?.[0]?.msg || `錯誤 ${r.status}`));
+  return data;
+}
+
+createApp({
+  data() {
+    const thisYear = new Date().getFullYear();
+    return {
+      tab: 'worship', online: false, busy: false, toast: '', touchX: 0,
+      cfg: { temple_name: '雲端聖恩宮', default_target_year: thisYear + 1, payment: {} },
+      profile: { userId: '', displayName: '十方善信' },
+      tabs: [{k:'worship',i:'🙏',t:'大殿參拜'},{k:'fortune',i:'🎋',t:'百首靈籤'},{k:'lamps',i:'🏮',t:'點燈安太歲'},{k:'ceremony',i:'🪷',t:'法會報名'},{k:'jishi',i:'🧘',t:'隨緣濟世'},{k:'search',i:'🔍',t:'線上尋燈'}],
+      deities: DEMO_DEITIES, deityIdx: 0, wish: '', wallName: '', wallWish: '', wallDeity: '關聖帝君', wallAnon: false, incenseLit: false, worshipLogs: [],
+      categories: ['事業','財利','功名','婚姻','家宅','病患','訟事','運勢'],
+      step: 'PRAY', sessionId: null, shaking: false, tossing: false, stick: null, ai: null, quickOpen: false, quickNo: null,
+      pray: { target_deity: '關聖帝君', believer_name: '', birth_info: '', address: '', category: '事業', question: '' },
+      div: { candidate: null, sheng: 0, message: '請誠心默念所求之事，搖動籤筒。', last: '' },
+      targetYear: thisYear + 1, yearInfo: null, lampTypes: [], family: [], cart: [], payMethod: 'BANK_TRANSFER', lastOrder: null, transferLast5: '', transferDate: '', orderPhone: '', ceremonies: [], jsSessions: [], js: { session_id: null, name: '', phone: '', birth: '', address: '', question: '' }, jsDone: null, jsQueryPhone: '', jsMine: [], jsQueried: false, cRegId: null, cDone: null, cLast5: '', cf: {},
+      member: { name: '', gender: '信士', relationship: '本人', solar_birth_date: '', birth_hour: null, phone: '', address: '' },
+      hours: ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'].map((z,i) => ({ v: i===0 ? 0 : i*2, t: `${z}時 (${String((i*2+23)%24).padStart(2,'0')}-${String(i*2+1).padStart(2,'0')})` })),
+      query: '', lights: [], searched: false, paidNotice: null, lots: [],
+      sc: (window.TEMPLE_CONFIG || {}).contact || {}, staticLamps: (window.TEMPLE_CONFIG || {}).lamps || [],
+    };
+  },
+  computed: {
+    deity() { return this.deities[this.deityIdx] || {}; },
+    cartTotal() { return this.cart.reduce((s, c) => s + c.price, 0); },
+    blockFaces() { return this.div.last === '笑杯' ? ['平面','平面'] : this.div.last === '陰杯' ? ['凸面','凸面'] : ['平面','凸面']; },
+    yearOptions() { const y = new Date().getFullYear(); return [y, y + 1].map(v => ({ year: v, label: `${v} 年` })); },
+    payOptions() {
+      const label = { BANK_TRANSFER: '🏦 匯款支付', TEMPLE_CASH: '💰 現場付現', LINE_PAY: 'LINE Pay', NEWEBPAY: '信用卡' };
+      return (this.cfg.payment_methods || ['BANK_TRANSFER', 'TEMPLE_CASH']).map(v => ({ v, t: label[v] || v }));
+    },
+    bank() { return this.cfg.bank || {}; },
+  },
+  async mounted() {
+    const q = new URLSearchParams(location.search);
+    try {
+      this.cfg = await api('/api/config'); this.online = true;
+      document.title = `${this.cfg.temple_name}・祈福聖殿`;
+      this.targetYear = this.cfg.default_target_year;
+      if (this.cfg.payment_methods && this.cfg.payment_methods.length) this.payMethod = this.cfg.payment_methods[0];
+    } catch (e) { this.online = false; this.applyStaticCfg(); }
+    await this.initLiff();
+    try { this.wallName = localStorage.getItem('temple_wall_name') || (this.profile.displayName !== '十方善信' ? this.profile.displayName : ''); } catch (e) {}
+    if (this.online) {
+      try { this.deities = (await api('/api/fortune/deities')).deities; } catch (e) {}
+      this.loadLogs(); setInterval(() => { if (this.tab === 'worship') this.loadLogs(); }, 30000); this.loadLampTypes(); this.loadCeremonies(); this.loadJishi(); this.loadFamily(); this.loadYearInfo();
+    }
+    if (q.get('tab')) this.tab = q.get('tab');
+    if (q.get('phone')) { this.query = q.get('phone'); this.searchLights(); }
+    if (q.get('paid')) this.paidNotice = { order_no: q.get('order_no') };
+  },
+  watch: {
+    deityIdx() { this.wallDeity = this.deity.name; },
+    targetYear() { this.loadYearInfo(); },
+    deityIdx(i) { this.$nextTick(() => { const el = this.$refs.deityBar?.querySelector(`[data-i="${i}"]`); el && el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }); },
+  },
+  methods: {
+    // ── 純網頁版（GitHub Pages）輔助 ──
+    applyStaticCfg() {
+      const c = window.TEMPLE_CONFIG || {};
+      this.cfg = { ...this.cfg, temple_name: c.temple_name || this.cfg.temple_name, bank: c.bank || {} };
+      document.title = `${this.cfg.temple_name}・祈福聖殿`;
+      try { this.worshipLogs = JSON.parse(localStorage.getItem('temple_wall_logs') || '[]'); } catch (e) {}
+      fetch('lots.json').then(r => r.json()).then(d => { this.lots = d; }).catch(() => {});
+    },
+    formUrl(k) { return (((window.TEMPLE_CONFIG || {}).google_forms || {})[k] || '').trim(); },
+    formEmbed(k) {
+      const u = this.formUrl(k);
+      if (!/docs\.google\.com\/forms\/.+\/viewform/.test(u)) return '';   // forms.gle 短網址或編輯網址：只顯示開啟按鈕
+      return u + (u.includes('?') ? '&' : '?') + 'embedded=true';
+    },
+    saveWallLocal() { try { localStorage.setItem('temple_wall_logs', JSON.stringify(this.worshipLogs.slice(0, 30))); } catch (e) {} },
+    lotOf(n) { return this.lots.find(l => l.number === n) || { ...DEMO_STICK }; },
+    offlineInterpret(stick) {
+      const p = this.pray, deity = p.target_deity || '關聖帝君', name = p.believer_name || this.profile.displayName;
+      const meaning = (stick.sacred_meanings || {})[p.category] || '誠心祈求，神明鑑察';
+      const lamp = { '關聖帝君': '關聖帝君光明燈', '濟公大師父': '濟公師父開運化劫燈', '濟公二師父': '濟公師父開運化劫燈',
+        '十二延天溪女娘娘': '溪女娘娘祈福護幼燈', '天上聖母': '天上聖母平安燈', '玄天上帝': '玄天上帝消災延壽燈',
+        '中壇元帥': '中壇元帥行車平安燈', '福德正神': '福德正財庫燈' }[deity] || '太歲平安燈';
+      return {
+        deity_greeting: `善信【${name}】誠心稟報，${deity}已鑑察祈願，特賜【${stick.title}（${stick.rank}）】指點迷津。`,
+        core_answer: `所問【${p.category}】${p.question ? '：' + p.question : ''}。${meaning} ${stick.vernacular_advice || ''}`,
+        poem_breakdown: `詩云：「${(stick.poem || []).join('，')}」。` + ((stick.shengyi || []).length ? `聖意：${stick.shengyi.join(' ')}。` : '') + (stick.story_title ? `典故【${stick.story_title}】${stick.story_content || ''}` : ''),
+        actionable_advice: ['秉持正心誠意，按部就班行事，切莫急躁妄動。', '謹記本籤聖意之訓示，日常多行善事、廣結善緣。', `常回本宮向${deity}參拜稟報，祈求貴人扶助。`],
+        recommended_lamp: lamp,
+        blessing_closing: `願${deity}暨本宮列位尊神庇佑 ${name} 闔家平安、所求遂意！`,
+      };
+    },
+    say(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => this.toast = '', 3500); },
+    async initLiff() {
+      let id = '';
+      try { id = localStorage.getItem('temple_uid') || ''; } catch (e) {}
+      if (this.cfg.liff_id && window.liff) {
+        try {
+          await liff.init({ liffId: this.cfg.liff_id });
+          if (!liff.isLoggedIn()) { liff.login(); return; }
+          const p = await liff.getProfile();
+          this.profile = { userId: p.userId, displayName: p.displayName };
+          this.pray.believer_name = this.pray.believer_name || p.displayName;
+          return;
+        } catch (e) { console.warn('LIFF 初始化失敗', e); }
+      }
+      if (!id) { id = 'WEB_' + Math.random().toString(36).slice(2, 12); try { localStorage.setItem('temple_uid', id); } catch (e) {} }
+      this.profile.userId = id;
+    },
+    // 神像：優先使用廟方實拍照片 static/deities/photos/<代號>.jpg，沒有則用內建插畫 SVG
+    deitySlug(name) { return DEITY_SLUGS[name] || 'guansheng'; },
+    deityImg(name) { return `static/deities/photos/${this.deitySlug(name)}.jpg`; },
+    // 依序嘗試 .jpg → .png → .jpeg → .webp，都沒有就用內建插畫 .svg
+    imgFallback(e, name) {
+      const slug = this.deitySlug(name), img = e.target;
+      const chain = ['png', 'jpeg', 'webp'].map(x => `static/deities/photos/${slug}.${x}`).concat(`static/deities/${slug}.svg`);
+      const cur = chain.findIndex(u => img.src.endsWith(u));
+      if (cur < chain.length - 1) img.src = chain[cur + 1];
+    },
+    stepDeity(d) { const n = this.deities.length; this.deityIdx = (this.deityIdx + d + n) % n; },
+    // 電腦版：滑鼠滾輪可橫向捲動、按住拖曳也可捲動
+    wheelBar(e) { this.$refs.deityBar.scrollLeft += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY); },
+    dragStart(e) {
+      const bar = this.$refs.deityBar, x0 = e.clientX, s0 = bar.scrollLeft; this._dragged = false;
+      bar.classList.remove('scroll-smooth');
+      const move = ev => { const dx = ev.clientX - x0; if (Math.abs(dx) > 5) this._dragged = true; bar.scrollLeft = s0 - dx; };
+      const up = () => { bar.classList.add('scroll-smooth'); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    },
+    onPill(i) { if (this._dragged) { this._dragged = false; return; } this.deityIdx = i; },
+    swipe(e) { const dx = e.changedTouches[0].clientX - this.touchX; if (Math.abs(dx) > 50) this.deityIdx = (this.deityIdx + (dx < 0 ? 1 : -1) + this.deities.length) % this.deities.length; },
+    async postWall() {
+      const name = this.wallName.trim(), wish = this.wallWish.trim();
+      if (!name) return this.say('請填寫信眾姓名');
+      if (!wish) return this.say('請填寫祈福心願');
+      const deity = this.wallDeity || this.deity.name;
+      this.busy = true;
+      try {
+        if (this.online) {
+          await api('/api/fortune/incense', { method: 'POST', body: JSON.stringify({ line_user_id: this.profile.userId, display_name: name, deity_name: deity, wish, anonymous: this.wallAnon }) });
+          await this.loadLogs();
+        } else {
+          this.worshipLogs.unshift({ name: this.wallAnon ? name[0] + '○'.repeat(name.length - 1) : name, deity, wish, time: '剛剛' }); this.saveWallLocal();
+        }
+        this.say(`已將心願敬呈【${deity}】，願神光普照、心想事成`);
+        this.wallWish = ''; this.incenseLit = true; setTimeout(() => this.incenseLit = false, 8000);
+        try { localStorage.setItem('temple_wall_name', name); } catch (e) {}
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async loadLogs() { try { this.worshipLogs = (await api('/api/fortune/incense/recent')).logs; } catch (e) {} },
+    async lightIncense() {
+      this.incenseLit = true;
+      if (this.online) {
+        try { const r = await api('/api/fortune/incense', { method: 'POST', body: JSON.stringify({ line_user_id: this.profile.userId, display_name: this.wallName.trim() || this.profile.displayName, deity_name: this.deity.name, wish: this.wish, anonymous: this.wallAnon }) }); this.say(r.message); this.loadLogs(); } catch (e) { this.say(e.message); }
+      } else { this.worshipLogs.unshift({ name: this.profile.displayName, deity: this.deity.name, wish: this.wish, time: '剛剛' }); this.saveWallLocal(); this.say(`已向【${this.deity.name}】誠心上香`); }
+      this.wish = ''; setTimeout(() => this.incenseLit = false, 8000);
+    },
+    // ── 求籤 ──
+    async startPray() {
+      if (!this.pray.believer_name.trim()) return this.say('請填寫姓名');
+      this.busy = true;
+      try {
+        if (this.online) { const r = await api('/api/fortune/start-pray', { method: 'POST', body: JSON.stringify({ ...this.pray, birth_info: this.pray.birth_info.trim() || '吉時', line_user_id: this.profile.userId }) }); this.sessionId = r.session_id; this.div.message = r.message; }
+        this.step = 'DRAW';
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async drawStick() {
+      this.shaking = true; await new Promise(r => setTimeout(r, 1500));
+      try {
+        if (this.online) { const r = await api(`/api/fortune/${this.sessionId}/draw-stick`, { method: 'POST' }); this.div.candidate = r.candidate_stick_number; this.div.message = r.message; }
+        else { this.div.candidate = 1 + Math.floor(Math.random() * 100); this.div.message = `抽出第 ${this.div.candidate} 籤，請擲筊請示（需連續三聖杯）`; }
+        this.div.sheng = 0; this.div.last = '';
+      } catch (e) { this.say(e.message); } finally { this.shaking = false; }
+    },
+    async throwBlocks() {
+      this.tossing = true; await new Promise(r => setTimeout(r, 700));
+      try {
+        let r;
+        if (this.online) r = await api(`/api/fortune/${this.sessionId}/throw-blocks`, { method: 'POST' });
+        else { const x = Math.random(); const res = x < .6 ? '聖杯' : x < .8 ? '笑杯' : '陰杯'; const s = res === '聖杯' ? this.div.sheng + 1 : 0;
+          r = { block_result: res, consecutive_sheng_bei: s, status: s >= 3 ? 'CONFIRMED' : res === '聖杯' ? 'THROWING_BLOCKS' : 'READY_TO_DRAW', message: res === '聖杯' ? `聖杯！已累計 ${s} 聖杯` : `擲出${res}，請重新抽籤`, fortune_stick: this.lotOf(this.div.candidate) }; }
+        this.div.last = r.block_result.slice(0, 2); this.div.sheng = r.consecutive_sheng_bei; this.div.message = r.message;
+        if (r.status === 'CONFIRMED') { this.stick = r.fortune_stick; setTimeout(() => this.step = 'RESULT', 900); }
+        else if (r.status === 'READY_TO_DRAW') setTimeout(() => { this.div.candidate = null; }, 1500);
+      } catch (e) { this.say(e.message); } finally { this.tossing = false; }
+    },
+    async requestAI() {
+      if (!this.online) { this.ai = this.offlineInterpret(this.stick); return; }
+      this.busy = true;
+      try { this.ai = (await api(`/api/fortune/${this.sessionId}/ai-interpret`, { method: 'POST' })).ai_interpretation; } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async quickInterpret() {
+      if (!(this.quickNo >= 1 && this.quickNo <= 100)) return this.say('請輸入 1~100 籤號');
+      if (!this.online) { this.stick = this.lotOf(this.quickNo); this.ai = this.offlineInterpret(this.stick); this.step = 'RESULT'; this.quickOpen = false; return; }
+      this.busy = true;
+      try {
+        const r = await api('/api/fortune/quick-ai-interpret', { method: 'POST', body: JSON.stringify({ stick_number: this.quickNo, believer_name: this.pray.believer_name || this.profile.displayName, target_deity: this.pray.target_deity, category: this.pray.category, question: this.pray.question }) });
+        this.stick = r.fortune_stick; this.ai = r.ai_interpretation; this.step = 'RESULT'; this.quickOpen = false;
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    resetFortune() { this.step = 'PRAY'; this.sessionId = null; this.stick = null; this.ai = null; this.div = { candidate: null, sheng: 0, message: '請誠心默念所求之事，搖動籤筒。', last: '' }; },
+    // ── 點燈 ──
+    async loadLampTypes() { try { this.lampTypes = (await api('/api/lamps/types')).lamp_types; } catch (e) {} },
+    async loadYearInfo() { if (this.online) try { this.yearInfo = await api(`/api/lamps/year-info/${this.targetYear}`); } catch (e) {} },
+    async loadFamily() { if (!this.online || !this.profile.userId) return; try { this.family = (await api(`/api/lamps/believers/${encodeURIComponent(this.profile.userId)}?target_year=${this.targetYear}`)).family_members; } catch (e) {} },
+    async addMember() {
+      const m = this.member;
+      if (!m.name || !m.solar_birth_date || !m.phone || !m.address) return this.say('請填寫姓名、生日、電話與地址');
+      this.busy = true;
+      try {
+        const r = await api(`/api/lamps/believers?target_year=${this.targetYear}`, { method: 'POST', body: JSON.stringify({ ...m, line_user_id: this.profile.userId }) });
+        this.say(r.message); this.query = m.phone;
+        this.member = { ...m, name: '', solar_birth_date: '', birth_hour: null, relationship: '配偶' };
+        await this.loadFamily();
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    picked(bid, code) { return this.cart.some(c => c.believer_id === bid && c.lamp_code === code); },
+    toggle(b, l) {
+      const i = this.cart.findIndex(c => c.believer_id === b.id && c.lamp_code === l.code);
+      if (i >= 0) this.cart.splice(i, 1); else this.cart.push({ believer_id: b.id, name: b.name, lamp_code: l.code, lamp_name: l.name, price: l.price });
+    },
+    async submitOrder() {
+      this.busy = true;
+      try {
+        const order = await api('/api/lamps/orders', { method: 'POST', body: JSON.stringify({ line_user_id: this.profile.userId, target_year: this.targetYear, payment_method: this.payMethod, items: this.cart.map(c => ({ believer_id: c.believer_id, lamp_code: c.lamp_code })) }) });
+        this.lastOrder = order; this.cart = []; this.transferLast5 = ''; this.transferDate = new Date().toISOString().slice(0, 10);
+        this.orderPhone = (this.family.find(f => f.believer.id === order.lamps[0]?.believer_id) || {}).believer?.phone || this.member.phone;
+        if (order.bank) this.cfg.bank = order.bank;
+        if (['TEMPLE_CASH', 'BANK_TRANSFER'].includes(this.payMethod)) return this.say(order.message);
+        const pay = await api(`/api/payment/checkout/${order.order_no}`, { method: 'POST' });
+        if (pay.payment_info.payment_url) {
+          if (window.liff && this.cfg.liff_id && liff.isInClient && liff.isInClient()) liff.openWindow({ url: pay.payment_info.payment_url, external: false });
+          else location.href = pay.payment_info.payment_url;
+        }
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async loadJishi() {
+      try { this.jsSessions = (await api('/api/jishi/sessions')).sessions; const o = this.jsSessions.find(s => s.open); if (o) this.js.session_id = o.id; } catch (e) {}
+      try { const n = localStorage.getItem('temple_wall_name'); if (n && !this.js.name) this.js.name = n; } catch (e) {}
+    },
+    async submitJishi() {
+      const j = this.js;
+      if (!j.name.trim() || (j.phone || '').replace(/\D/g, '').length < 6 || !j.birth.trim() || !j.address.trim() || !j.question.trim()) return this.say('請完整填寫姓名、電話、生辰、住址與請示事項');
+      this.busy = true;
+      try {
+        const r = await api('/api/jishi/register', { method: 'POST', body: JSON.stringify({ ...j, line_user_id: this.profile.userId }) });
+        this.jsDone = r.registration; this.jsQueryPhone = j.phone; this.say(r.message); this.loadJishi();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async queryJishi() {
+      if ((this.jsQueryPhone || '').replace(/\D/g, '').length < 6) return this.say('請輸入報名電話');
+      try { this.jsMine = (await api(`/api/jishi/my?phone=${encodeURIComponent(this.jsQueryPhone)}`)).registrations; this.jsQueried = true; } catch (e) { this.say(e.message); }
+    },
+    async loadCeremonies() { try { this.ceremonies = (await api('/api/ceremonies')).ceremonies; } catch (e) {} },
+    openCeremony(c) {
+      this.cRegId = c.id; this.cDone = null; this.cLast5 = '';
+      const m = this.family[0]?.believer || {};
+      this.cf = { item_name: c.items[0]?.name, quantity: 1, name: this.cf.name || m.name || this.wallName || '', phone: this.cf.phone || m.phone || '', address: this.cf.address || m.address || '', participantsText: '', note: '', payment_method: 'BANK_TRANSFER' };
+    },
+    cTotal(c) { const it = c.items.find(i => i.name === this.cf.item_name); return (it ? it.price : 0) * (this.cf.quantity || 1); },
+    async submitCeremony(c) {
+      if (!this.cf.name.trim() || (this.cf.phone || '').replace(/\D/g, '').length < 6) return this.say('請填寫姓名與電話');
+      this.busy = true;
+      try {
+        const { participantsText, ...rest } = this.cf;
+        this.cDone = await api(`/api/ceremonies/${c.id}/register`, { method: 'POST', body: JSON.stringify({ ...rest, line_user_id: this.profile.userId, participants: participantsText.split('\n') }) });
+        this.say(this.cDone.message); this.loadCeremonies();
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async reportCeremonyTransfer() {
+      if (!/^\d{5}$/.test(this.cLast5)) return this.say('請輸入 5 位數字的帳號後五碼');
+      this.busy = true;
+      try {
+        const r = await api(`/api/ceremonies/registrations/${this.cDone.registration.reg_no}/transfer-report`, { method: 'POST', body: JSON.stringify({ phone: this.cf.phone, last5: this.cLast5, transfer_date: new Date().toISOString().slice(0, 10) }) });
+        this.cDone.reported = true; this.say(r.message);
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    async reportTransfer() {
+      if (!/^\d{5}$/.test(this.transferLast5)) return this.say('請輸入 5 位數字的帳號後五碼');
+      this.busy = true;
+      try {
+        const r = await api(`/api/lamps/orders/${this.lastOrder.order_no}/transfer-report`, { method: 'POST', body: JSON.stringify({ phone: this.orderPhone, last5: this.transferLast5, transfer_date: this.transferDate }) });
+        this.lastOrder.reported = true; this.say(r.message);
+      } catch (e) { this.say(e.message); } finally { this.busy = false; }
+    },
+    copyText(t) { navigator.clipboard?.writeText(t).then(() => this.say('已複製帳號'), () => this.say(t)); },
+    async searchLights() {
+      if (!this.online) return this.say('尋燈需啟動後端');
+      if ((this.query || '').replace(/\D/g, '').length < 6) return this.say('請輸入報名電話');
+      try { const r = await api(`/api/lamps/search-light?phone=${encodeURIComponent(this.query)}`); this.lights = r.lights; this.searched = true; } catch (e) { this.say(e.message); }
+    },
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
