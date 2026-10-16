@@ -450,7 +450,7 @@
 <script>
 const { createApp } = Vue;
 const DEITY_SLUGS = { '關聖帝君': 'guansheng', '福德正神': 'fude', '天上聖母': 'mazu', '十二延天溪女娘娘': 'xinu',
-  '玄天上帝': 'xuantian', '中壇元帥': 'nezha', '濟公大師父': 'jigong1', '濟公二師父': 'jigong2' };
+  '玄天上帝': 'xuantian', '中壇元帥': 'nezha', '濟公大師父': 'jigong1', '濟公二師父': 'jigong2', '天官武財神': 'wucaishen' };
 const DEMO_DEITIES = [
   ['關聖帝君','主祀','關聖','文衡聖帝・協天大帝・武財尊神',['忠義護佑','事業功名','武財正財']],
   ['福德正神','陪祀','福德','土地公・商業財庫',['五穀豐登','商業財庫']],
@@ -460,6 +460,7 @@ const DEMO_DEITIES = [
   ['中壇元帥','陪祀','元帥','三太子・開路先鋒',['行車平安','孩童安康']],
   ['濟公大師父','陪祀','濟公','濟公活佛・靈感濟世',['指點迷津','化險為夷']],
   ['濟公二師父','陪祀','二師','排憂解難・開運招福',['廣結善緣','開運招福']],
+  ['天官武財神','陪祀','財神','玄壇元帥・招財進寶・正偏財運',['招財進寶','生意興隆']],
 ].map(([name,role,short_icon,title_desc,blessing_tags]) => ({name,role,short_icon,title_desc,blessing_tags}));
 const DEMO_STICK = { number: 1, title: '第一籤', ganzhi_code: '甲甲', rank: '上吉', poem: ['巍巍獨步向雲間','玉殿千官第一班','富貴榮華天付汝','福如東海壽如山'],
   shengyi: ['功名遂','福祿全','訟得理','病即痊','桑麻熟','婚姻圓','孕生子','行人還'], sacred_meanings: {}, vernacular_advice: '（展示模式）啟動後端即可看到完整解說。', story_title: '十八學士登瀛洲' };
@@ -549,7 +550,7 @@ createApp({
       const meaning = (stick.sacred_meanings || {})[p.category] || '誠心祈求，神明鑑察';
       const lamp = { '關聖帝君': '關聖帝君光明燈', '濟公大師父': '濟公師父開運化劫燈', '濟公二師父': '濟公師父開運化劫燈',
         '十二延天溪女娘娘': '溪女娘娘祈福護幼燈', '天上聖母': '天上聖母平安燈', '玄天上帝': '玄天上帝消災延壽燈',
-        '中壇元帥': '中壇元帥行車平安燈', '福德正神': '福德正財庫燈' }[deity] || '太歲平安燈';
+        '中壇元帥': '中壇元帥行車平安燈', '福德正神': '福德正財庫燈', '天官武財神': '關聖帝君武財神燈' }[deity] || '太歲平安燈';
       return {
         deity_greeting: `善信【${name}】誠心稟報，${deity}已鑑察祈願，特賜【${stick.title}（${stick.rank}）】指點迷津。`,
         core_answer: `所問【${p.category}】${p.question ? '：' + p.question : ''}。${meaning} ${stick.vernacular_advice || ''}`,
