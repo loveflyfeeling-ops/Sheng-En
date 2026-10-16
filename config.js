@@ -8,10 +8,10 @@ window.TEMPLE_CONFIG = {
 
   // 聯絡資訊（顯示在點燈、法會、濟世、尋燈頁面），沒有的項目留空即可
   contact: {
-    phone: '',          // 例：'05-1234567'
-    line_url: '',       // 例：'https://lin.ee/xxxxxxx'
-    address: '',        // 例：'雲林縣斗六市○○路○號'
-    hours: '',          // 例：'每日 07:00–21:00'
+    phone: '',          // 例：'0926-990032'
+    line_url: '',       // 例：'https://line.me/ti/g/lM2FMiP3dT'
+    address: '',        // 例：'雲林縣斗六市中山路395號'
+    hours: '',          // 例：'每週五 20:30–23:00'
   },
 
   // Google 表單網址（法會報名、隨緣濟世）。填了就會直接在網頁上顯示表單讓信眾報名
@@ -28,39 +28,39 @@ window.TEMPLE_CONFIG = {
   lamps: [
       {
           "name": "太歲平安燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "關聖帝君光明燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "關聖帝君武財神燈",
-          "price": 1200
+          "price": 1000
       },
       {
           "name": "福德正財庫燈",
-          "price": 800
+          "price": 1000
       },
       {
           "name": "天上聖母平安燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "溪女娘娘祈福護幼燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "玄天上帝消災延壽燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "中壇元帥行車平安燈",
-          "price": 600
+          "price": 300
       },
       {
           "name": "濟公師父開運化劫燈",
-          "price": 800
+          "price": 1000
       }
   ],
 };
