@@ -466,6 +466,7 @@ const DEMO_STICK = { number: 1, title: '第一籤', ganzhi_code: '甲甲', rank:
   shengyi: ['功名遂','福祿全','訟得理','病即痊','桑麻熟','婚姻圓','孕生子','行人還'], sacred_meanings: {}, vernacular_advice: '（展示模式）啟動後端即可看到完整解說。', story_title: '十八學士登瀛洲' };
 
 const API_BASE = ((window.TEMPLE_CONFIG || {}).apiBase || '').replace(/\/$/, '');
+const WALL_API = ((window.TEMPLE_CONFIG || {}).wall_api || '').trim();
 async function api(path, opts = {}) {
   if (!API_BASE) throw new Error('此功能請洽本宮辦理');
   const r = await fetch(API_BASE + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -534,7 +535,8 @@ createApp({
       const c = window.TEMPLE_CONFIG || {};
       this.cfg = { ...this.cfg, temple_name: c.temple_name || this.cfg.temple_name, bank: c.bank || {} };
       document.title = `${this.cfg.temple_name}・祈福聖殿`;
-      try { this.worshipLogs = JSON.parse(localStorage.getItem('temple_wall_logs') || '[]'); } catch (e) {}
+      if (WALL_API) { this.loadWallRemote(); setInterval(() => { if (this.tab === 'worship') this.loadWallRemote(); }, 60000); }
+      else try { this.worshipLogs = JSON.parse(localStorage.getItem('temple_wall_logs') || '[]'); } catch (e) {}
       fetch('lots.json').then(r => r.json()).then(d => { this.lots = d; }).catch(() => {});
     },
     formUrl(k) { return (((window.TEMPLE_CONFIG || {}).google_forms || {})[k] || '').trim(); },
@@ -543,7 +545,16 @@ createApp({
       if (!/docs\.google\.com\/forms\/.+\/viewform/.test(u)) return '';   // forms.gle 短網址或編輯網址：只顯示開啟按鈕
       return u + (u.includes('?') ? '&' : '?') + 'embedded=true';
     },
-    saveWallLocal() { try { localStorage.setItem('temple_wall_logs', JSON.stringify(this.worshipLogs.slice(0, 30))); } catch (e) {} },
+    // 祈福牆：有設定 wall_api（Google Apps Script）就送到雲端試算表，所有信眾都看得到、廟方可在試算表管理
+    async loadWallRemote() { try { const d = await (await fetch(WALL_API)).json(); if (d.logs) this.worshipLogs = d.logs; } catch (e) {} },
+    saveWallLocal(name, deity, wish, anonymous) {
+      if (WALL_API) {
+        fetch(WALL_API, { method: 'POST', body: JSON.stringify({ name, deity, wish, anonymous }) })
+          .then(() => setTimeout(() => this.loadWallRemote(), 800)).catch(() => {});
+        return;
+      }
+      try { localStorage.setItem('temple_wall_logs', JSON.stringify(this.worshipLogs.slice(0, 30))); } catch (e) {}
+    },
     lotOf(n) { return this.lots.find(l => l.number === n) || { ...DEMO_STICK }; },
     offlineInterpret(stick) {
       const p = this.pray, deity = p.target_deity || '關聖帝君', name = p.believer_name || this.profile.displayName;
@@ -610,7 +621,7 @@ createApp({
           await api('/api/fortune/incense', { method: 'POST', body: JSON.stringify({ line_user_id: this.profile.userId, display_name: name, deity_name: deity, wish, anonymous: this.wallAnon }) });
           await this.loadLogs();
         } else {
-          this.worshipLogs.unshift({ name: this.wallAnon ? name[0] + '○'.repeat(name.length - 1) : name, deity, wish, time: '剛剛' }); this.saveWallLocal();
+          this.worshipLogs.unshift({ name: this.wallAnon ? name[0] + '○'.repeat(name.length - 1) : name, deity, wish, time: '剛剛' }); this.saveWallLocal(name, deity, wish, this.wallAnon);
         }
         this.say(`已將心願敬呈【${deity}】，願神光普照、心想事成`);
         this.wallWish = ''; this.incenseLit = true; setTimeout(() => this.incenseLit = false, 8000);
@@ -622,7 +633,7 @@ createApp({
       this.incenseLit = true;
       if (this.online) {
         try { const r = await api('/api/fortune/incense', { method: 'POST', body: JSON.stringify({ line_user_id: this.profile.userId, display_name: this.wallName.trim() || this.profile.displayName, deity_name: this.deity.name, wish: this.wish, anonymous: this.wallAnon }) }); this.say(r.message); this.loadLogs(); } catch (e) { this.say(e.message); }
-      } else { this.worshipLogs.unshift({ name: this.profile.displayName, deity: this.deity.name, wish: this.wish, time: '剛剛' }); this.saveWallLocal(); this.say(`已向【${this.deity.name}】誠心上香`); }
+      } else { this.worshipLogs.unshift({ name: this.profile.displayName, deity: this.deity.name, wish: this.wish, time: '剛剛' }); this.saveWallLocal(this.wallName.trim() || this.profile.displayName, this.deity.name, this.wish, this.wallAnon); this.say(`已向【${this.deity.name}】誠心上香`); }
       this.wish = ''; setTimeout(() => this.incenseLit = false, 8000);
     },
     // ── 求籤 ──
