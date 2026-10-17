@@ -8,10 +8,10 @@ window.TEMPLE_CONFIG = {
 
   // 聯絡資訊（顯示在點燈、法會、濟世、尋燈頁面），沒有的項目留空即可
   contact: {
-    phone: '',          // 例：'0926-990032'
-    line_url: '',       // 例：'https://line.me/ti/g/lM2FMiP3dT'
-    address: '',        // 例：'雲林縣斗六市中山路395號'
-    hours: '',          // 例：'每週五 20:30–23:00'
+    phone: '0926-990032',// 例：'0926-990032'
+    line_url: 'https://line.me/ti/g/lM2FMiP3dT',// 例：'https://line.me/ti/g/lM2FMiP3dT'
+    address: '雲林縣斗六市中山路395號',        // 例：'雲林縣斗六市中山路395號'
+    hours: '每週五 20:30–23:00',          // 例：'每週五 20:30–23:00'
   },
 
   // Google 表單網址（法會報名、隨緣濟世）。填了就會直接在網頁上顯示表單讓信眾報名
