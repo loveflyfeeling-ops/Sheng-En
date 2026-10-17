@@ -21,6 +21,9 @@ window.TEMPLE_CONFIG = {
     jishi: 'https://docs.google.com/forms/d/e/1FAIpQLSe7t3m5EbSum35ZajefgmmJav2gzUpe4RT7PG2f55gAbuJgog/viewform',
   },
 
+  // 雲端祈福牆網址（Google Apps Script 網頁應用程式）。祈福心願會存進 Google 試算表「祈福牆」分頁
+  wall_api: 'https://script.google.com/macros/s/AKfycbzgnRC6uFip0QnS3N4_iNw4AQV9PcvB7Uyb9EGoNF8MJmt8lOzqY9sw38rqsdI2iAGECQ/exec',
+
   // 匯款帳號（留空則不顯示）
   bank: { bank_name: '', bank_code: '', branch: '', account: '', account_name: '' },
 
