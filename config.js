@@ -8,9 +8,9 @@ window.TEMPLE_CONFIG = {
 
   // 聯絡資訊（顯示在點燈、法會、濟世、尋燈頁面），沒有的項目留空即可
   contact: {
-    phone: '0926-000000',// 例：'0926-000000'
+    phone: '',          // 例：'0926-000000'
     line_url: 'https://line.me/ti/g/lM2FMiP3dT',// 例：'https://line.me/ti/g/lM2FMiP3dT'
-    address: '雲林縣斗六市',        // 例：'雲林縣斗六市'
+    address: '',        // 例：'雲林縣斗六市'
     hours: '每週五 20:30–23:00',          // 例：'每週五 20:30–23:00'
   },
 
